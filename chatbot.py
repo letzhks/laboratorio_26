@@ -13,7 +13,7 @@ from langchain_core.output_parsers import StrOutputParser
 
 st.header("Assistenza online")
 
-st.image("RAG classe/Chatbot.webp", width=400)
+st.image("Chatbot.webp", width=400)
 
 st.markdown(
     """
