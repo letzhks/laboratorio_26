@@ -25,31 +25,48 @@ st.markdown(
 
 st.header("Il tuo assistente di Diritto Costituzionale")
 
-st.image("Chatbot.webp", width=500)
+st.image("RAG CLASSE/Chatbot.webp", width=500)
 
-documento = "Costituzione_italiana.pdf"
+documento = "RAG CLASSE/Costituzione_italiana.pdf"
 
 openai_api_key=st.secrets["OPENAI_API_KEY"]
 
 if documento is not None:
-    with pdfplumber.open(documento) as pdf:
-        # st.write(f"Pagine totali: {len(pdf.pages)} - Comincio la scansione...")
-        testo = ""
-        for pagina in pdf.pages:
-            testo = testo + pagina.extract_text() + "\n"
+    @st.cache_data(show_spinner="Sto leggendo il PDF...")
+    def estrai_testo_pdf(documento: str) -> str:
+        with pdfplumber.open(documento) as pdf:
+            # st.write(f"Pagine totali: {len(pdf.pages)} - Comincio la scansione...")
+            testo = ""
+            for pagina in pdf.pages:
+                # Se la pagina è null menttiamo ""
+                testo_pagina = pagina.extract_text() or ""
+                testo = testo + testo_pagina + "\n"
+                # testo += pagina.extract_text() + "\n"
+        return testo.strip()
+    
+    testo = estrai_testo_pdf(documento)
 
-    taglierina = RecursiveCharacterTextSplitter(
+    @st.cache_data(show_spinner=False)
+    def crea_frammenti(testo: str):
+        taglierina = RecursiveCharacterTextSplitter(
         separators=["\n\n", "\n", ". ", " "],
         chunk_size=1000,
         chunk_overlap=200)
-    
-    frammenti = taglierina.split_text(testo)
+        return taglierina.split_text(testo)
 
-    embeddings = OpenAIEmbeddings(
-        model="text-embedding-3-small",
-        openai_api_key=st.secrets["OPENAI_API_KEY"])
+    frammenti = crea_frammenti(testo)
+    # st.write(f"Totale frammenti creati: {len(frammenti)}")
+    # st.write(frammenti)
+
+    @st.cache_resource(show_spinner=False)
+    def crea_vectorstore(frammenti):
+        embeddings = OpenAIEmbeddings(
+            model="text-embedding-3-small",
+            openai_api_key=st.secrets["OPENAI_API_KEY"])
+        return FAISS.from_texts(frammenti, embedding=embeddings)
     
-    vettori = FAISS.from_texts(frammenti, embedding=embeddings)
+    vettori = crea_vectorstore(frammenti)
+    # st.write("Embedding recuperati!")
 
     def invia():
         st.session_state.domanda_inviata = st.session_state.domanda_utente
